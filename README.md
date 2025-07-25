@@ -14,10 +14,18 @@ For each price level, a FIFO will store the orders as they arrive (time preferen
 I found this solution a good one for a first implementation. 
 In the future I can change it to something better.
 
-
-#### Testing ideas
+### Testing ideas
 
 I found (some datasets)[https://lobsterdata.com/info/DataSamples.php] which I can
 use to mimic orders arriving at the exchange.
 
 My idea is to stress the application, measure and improve performance as a iterative process.
+
+### TODO
+
+- [] write unit tests for Price Level (FIFO Queue)
+- [] Bid/Ask Linked Lists implementation (add, update, cancel) and unit tests
+- [] Order Book implementation (add, update, cancel) and unit tests
+- [] Order Matching implementation and unit tests
+- [] interface for external calling (http, unix socket)
+- [] app/script that reads historical dataset and call the Exchange to register orders
