@@ -23,9 +23,9 @@ My idea is to stress the application, measure and improve performance as a itera
 
 ### TODO
 
-- [] write unit tests for Price Level (FIFO Queue)
-- [] Bid/Ask Linked Lists implementation (add, update, cancel) and unit tests
-- [] Order Book implementation (add, update, cancel) and unit tests
-- [] Order Matching implementation and unit tests
-- [] interface for external calling (http, unix socket)
-- [] app/script that reads historical dataset and call the Exchange to register orders
+- [ ] write unit tests for Price Level (FIFO Queue)
+- [ ] Bid/Ask Linked Lists implementation (add, update, cancel) and unit tests
+- [ ] Order Book implementation (add, update, cancel) and unit tests
+- [ ] Order Matching implementation and unit tests
+- [ ] interface for external calling (http, unix socket)
+- [ ] app/script that reads historical dataset and call the Exchange to register orders
