@@ -16,7 +16,7 @@ In the future I can change it to something better.
 
 ### Testing ideas
 
-I found (some datasets)[https://lobsterdata.com/info/DataSamples.php] which I can
+I found [some datasets](https://lobsterdata.com/info/DataSamples.php) which I can
 use to mimic orders arriving at the exchange.
 
 My idea is to stress the application, measure and improve performance as a iterative process.
