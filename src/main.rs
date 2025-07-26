@@ -27,9 +27,9 @@ impl Queue {
         self.items.pop_front()
     }
 
-    // fn get(&self) -> Option<&Order> {
-    //     self.items.get(0)
-    // }
+    fn get(&self) -> Option<&Order> {
+        self.items.get(0)
+    }
 
     fn get_mut(&mut self) -> Option<&mut Order> {
         self.items.get_mut(0)
@@ -41,7 +41,7 @@ impl Queue {
         let mut result: Vec<Order> = Vec::new();
 
         while remaining > 0 {
-            dbg!(remaining);
+            // dbg!(remaining);
 
             if remaining == 0 {
                 break;
@@ -132,4 +132,49 @@ fn main() {
 
     println!("Result: {:?}", result);
     println!("Queue: {:?}", queue);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_queue() {
+        let mut queue = Queue::new();
+
+        let a = Order {
+            id: 1,
+            size: 100,
+            price: 100,
+        };
+        let b = Order {
+            id: 2,
+            size: 200,
+            price: 100,
+        };
+        let c = Order {
+            id: 3,
+            size: 50,
+            price: 100,
+        };
+        let d = Order {
+            id: 4,
+            size: 150,
+            price: 100,
+        };
+
+        queue.add(a);
+        queue.add(b);
+        queue.add(c);
+        queue.add(d);
+
+        let result = queue.update(375);
+        let remaining_item = queue.get().unwrap();
+
+        assert_eq!(result.len(), 4);
+        assert_eq!(result.iter().map(|item| item.size).sum::<u16>(), 375);
+
+        assert_eq!(remaining_item.id, 4);
+        assert_eq!(remaining_item.size, 125);
+    }
 }
