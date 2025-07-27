@@ -28,4 +28,5 @@ My idea is to stress the application, measure and improve performance as a itera
 - [ ] Order Book implementation (add, update, cancel) and unit tests
 - [ ] Order Matching implementation and unit tests
 - [ ] interface for external calling (http, unix socket)
+- [ ] Order config params (match with insufficient volume)
 - [ ] app/script that reads historical dataset and call the Exchange to register orders
