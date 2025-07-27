@@ -45,18 +45,49 @@ impl Queue {
         self.items.get_mut(0)
     }
 
-    fn update(&mut self, amount: u16) -> Vec<Order> {
+    fn can_consume(&self, amount: u16) -> Vec<Order> {
+        let mut remaining: u16 = amount;
+
+        let mut result: Vec<Order> = Vec::new();
+
+        let mut items = self.items.iter();
+
+        while remaining > 0 {
+            dbg!(remaining);
+            if let Some(next_item) = items.next() {
+                match next_item.size <= remaining {
+                    true => {
+                        remaining -= next_item.size;
+
+                        result.push(Order {
+                            id: next_item.id,
+                            price: next_item.price,
+                            size: next_item.size,
+                        });
+                    },
+                    false => {
+                        result.push(Order {
+                            id: next_item.id,
+                            price: next_item.price,
+                            size: remaining,
+                        });
+
+                        remaining = 0;
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    fn consume(&mut self, amount: u16) -> Vec<Order> {
         let mut remaining: u16 = amount;
 
         let mut result: Vec<Order> = Vec::new();
 
         while remaining > 0 {
-            if remaining == 0 {
-                break;
-            }
-
             if let Some(next_item) = self.get_mut() {
-                match dbg!(next_item.size <= remaining) {
+                match next_item.size <= remaining {
                     true => {
                         remaining -= next_item.size;
 
@@ -78,7 +109,6 @@ impl Queue {
                 }
             }
         }
-
         result
     }
 }
@@ -124,7 +154,66 @@ impl Book {
         self.bid.len()
     }
 
+    fn match_ask(&mut self, order: &Order) {
+        let mut remaining = order.size;
+        let mut bids = self.bid.iter_mut();
+
+        // TODO: I must somehow return the ids of the matched
+        // orders
+        while remaining > 0 {
+            if let Some(item) = bids.next() {
+                remaining -= item
+                    .queue
+                    .consume(order.size)
+                    .iter()
+                    .map(|x| x.size)
+                    .sum::<u16>();
+            }
+        }
+
+        // if price level is empty, the price level must be deleted
+        // TODO: delete price levels with no orders
+
+        if let Some(highest_bid_price_lvl) = self.bid.front() {
+            self.highest_bid = highest_bid_price_lvl.price;
+        } else {
+            self.highest_bid = 0;
+        }
+    }
+
+    fn can_match_ask(&mut self, order: &Order) -> bool {
+        let mut remaining = order.size;
+        let mut bids = self.bid.iter();
+
+        while remaining > 0 {
+            if let Some(item) = bids.next() {
+                if item.price < order.price {
+                    break;
+                }
+
+                remaining -= item
+                    .queue
+                    .can_consume(order.size)
+                    .iter()
+                    .map(|x| x.size)
+                    .sum::<u16>();
+            }
+        }
+
+        if remaining > 0 {
+            return false;
+        }
+
+        return true;
+    }
+
     fn add_ask(&mut self, order: Order) {
+        if order.price <= self.highest_bid {
+            if self.can_match_ask(&order) {
+                self.match_ask(&order);
+            }
+        }
+
         if let Some(lowest_ask_item) = self.ask.front_mut() {
             match self.lowest_ask.cmp(&order.price) {
                 std::cmp::Ordering::Less => {
@@ -194,38 +283,71 @@ impl Book {
 }
 
 fn main() {
-    let mut queue = Queue::new();
+    // let mut queue = Queue::new();
+    //
+    // let a = Order {
+    //     id: 1,
+    //     size: 100,
+    //     price: 100,
+    // };
+    // let b = Order {
+    //     id: 2,
+    //     size: 200,
+    //     price: 100,
+    // };
+    // let c = Order {
+    //     id: 3,
+    //     size: 50,
+    //     price: 100,
+    // };
+    // let d = Order {
+    //     id: 4,
+    //     size: 150,
+    //     price: 100,
+    // };
+    //
+    // queue.add(a);
+    // queue.add(b);
+    // queue.add(c);
+    // queue.add(d);
+    //
+    // let result = queue.consume(375);
+
+    let mut book = Book {
+        highest_bid: 40,
+        bid: LinkedList::from([LinkedItem {
+            price: 40,
+            queue: Queue {
+                items: VecDeque::from([Order {
+                    price: 40,
+                    size: 100,
+                    id: 1,
+                }]),
+            },
+        }]),
+        lowest_ask: 50,
+        ask: LinkedList::from([LinkedItem {
+            price: 50,
+            queue: Queue {
+                items: VecDeque::from([Order {
+                    price: 50,
+                    size: 100,
+                    id: 2,
+                }]),
+            },
+        }]),
+    };
 
     let a = Order {
-        id: 1,
-        size: 100,
-        price: 100,
-    };
-    let b = Order {
-        id: 2,
-        size: 200,
-        price: 100,
-    };
-    let c = Order {
         id: 3,
-        size: 50,
-        price: 100,
-    };
-    let d = Order {
-        id: 4,
-        size: 150,
-        price: 100,
+        size: 100,
+        price: 40,
     };
 
-    queue.add(a);
-    queue.add(b);
-    queue.add(c);
-    queue.add(d);
+    book.add_ask(a);
 
-    let result = queue.update(375);
-
-    println!("Result: {:?}", result);
-    println!("Queue: {:?}", queue);
+    // println!("Result: {:?}", result);
+    // println!("Queue: {:?}", queue);
 }
 
 #[cfg(test)]
@@ -262,7 +384,7 @@ mod tests {
         queue.add(c);
         queue.add(d);
 
-        let result = queue.update(375);
+        let result = queue.consume(375);
         let remaining_item = queue.get().unwrap();
 
         assert_eq!(result.len(), 4);
@@ -528,5 +650,43 @@ mod tests {
                 .sum::<u16>(),
             300
         );
+    }
+
+    #[test]
+    fn match_ask() {
+        let mut book = Book {
+            highest_bid: 40,
+            bid: LinkedList::from([LinkedItem {
+                price: 40,
+                queue: Queue {
+                    items: VecDeque::from([Order {
+                        price: 40,
+                        size: 100,
+                        id: 1,
+                    }]),
+                },
+            }]),
+            lowest_ask: 50,
+            ask: LinkedList::from([LinkedItem {
+                price: 50,
+                queue: Queue {
+                    items: VecDeque::from([Order {
+                        price: 50,
+                        size: 100,
+                        id: 2,
+                    }]),
+                },
+            }]),
+        };
+
+        let a = Order {
+            id: 3,
+            size: 100,
+            price: 40,
+        };
+
+        book.add_ask(a);
+
+        assert_eq!(book.highest_bid, 0);
     }
 }

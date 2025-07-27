@@ -23,7 +23,7 @@ My idea is to stress the application, measure and improve performance as a itera
 
 ### TODO
 
-- [ ] write unit tests for Price Level (FIFO Queue)
+- [x] write unit tests for Price Level (FIFO Queue)
 - [ ] Bid/Ask Linked Lists implementation (add, update, cancel) and unit tests
 - [ ] Order Book implementation (add, update, cancel) and unit tests
 - [ ] Order Matching implementation and unit tests
