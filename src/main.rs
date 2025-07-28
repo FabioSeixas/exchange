@@ -80,10 +80,8 @@ impl Queue {
         result
     }
 
-    fn consume(&mut self, amount: u16) -> Vec<Order> {
+    fn consume(&mut self, amount: u16, buf: &mut Vec<Order>) -> u16 {
         let mut remaining: u16 = amount;
-
-        let mut result: Vec<Order> = Vec::new();
 
         while remaining > 0 {
             if self.get().is_none() {
@@ -95,13 +93,13 @@ impl Queue {
                     remaining -= next_item.size;
 
                     if let Some(order) = self.dequeue() {
-                        result.push(order);
+                        buf.push(order);
                     }
                 }
                 false => {
                     next_item.size -= remaining;
 
-                    result.push(Order {
+                    buf.push(Order {
                         id: next_item.id,
                         price: next_item.price,
                         size: remaining,
@@ -111,7 +109,7 @@ impl Queue {
                 }
             }
         }
-        result
+        amount - remaining
     }
 }
 
@@ -131,15 +129,16 @@ impl PriceLevel {
         }
     }
 
-    fn consume(&mut self, amount: u16) -> Vec<Order> {
-        let consumed_orders = self.queue.consume(amount);
-        self.volume -= consumed_orders.iter().map(|x| x.size).sum::<u16>();
-        consumed_orders
+    fn consume(&mut self, amount: u16, buf: &mut Vec<Order>) -> u16 {
+        let consumed_volume = self.queue.consume(amount, buf);
+        self.volume -= consumed_volume;
+        consumed_volume
     }
 }
 
 #[derive(Debug)]
 struct Book {
+    last_consumed_orders: Vec<Order>,
     highest_bid: u16,
     lowest_ask: u16,
     bid: LinkedList<PriceLevel>,
@@ -157,6 +156,7 @@ impl Book {
             lowest_ask: 0,
             bid: LinkedList::new(),
             ask: LinkedList::new(),
+            last_consumed_orders: vec![],
         }
     }
 
@@ -178,7 +178,7 @@ impl Book {
             match bids.next() {
                 None => break,
                 Some(item) => {
-                    remaining -= item.consume(remaining).iter().map(|x| x.size).sum::<u16>();
+                    remaining -= item.consume(remaining, &mut self.last_consumed_orders);
 
                     if item.volume == 0 {
                         delete_lvls_count += 1;
@@ -243,6 +243,8 @@ impl Book {
         if order.price <= self.highest_bid {
             if self.can_match_ask(&order) {
                 self.match_ask(&order);
+
+                return Ok(());
             } else {
                 return Err(AddOrderErrors::InsufficientMatch);
             }
@@ -320,6 +322,7 @@ impl Book {
 
 fn main() {
     let mut book = Book {
+        last_consumed_orders: vec![],
         highest_bid: 40,
         bid: LinkedList::from([PriceLevel::new(Order {
             price: 40,
@@ -380,11 +383,12 @@ mod tests {
         queue.add(c);
         queue.add(d);
 
-        let result = queue.consume(375);
+        let mut buf = vec![];
+        queue.consume(375, &mut buf);
         let remaining_item = queue.get().unwrap();
 
-        assert_eq!(result.len(), 4);
-        assert_eq!(result.iter().map(|item| item.size).sum::<u16>(), 375);
+        assert_eq!(buf.len(), 4);
+        assert_eq!(buf.iter().map(|item| item.size).sum::<u16>(), 375);
 
         assert_eq!(remaining_item.id, 4);
         assert_eq!(remaining_item.size, 125);
@@ -426,6 +430,7 @@ mod tests {
     #[test]
     fn higher_bid_price_level() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 0,
             highest_bid: 50,
             ask: LinkedList::new(),
@@ -469,6 +474,7 @@ mod tests {
     #[test]
     fn add_lower_bid_price_level() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 0,
             highest_bid: 500,
             ask: LinkedList::new(),
@@ -545,6 +551,7 @@ mod tests {
     #[test]
     fn lower_ask_price_level() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 200,
             highest_bid: 0,
             bid: LinkedList::new(),
@@ -588,6 +595,7 @@ mod tests {
     #[test]
     fn add_higher_ask_price_level() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 50,
             highest_bid: 0,
             bid: LinkedList::new(),
@@ -631,6 +639,7 @@ mod tests {
     #[test]
     fn match_ask() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 50,
             highest_bid: 40,
             bid: LinkedList::from([PriceLevel::new(Order {
@@ -660,6 +669,7 @@ mod tests {
     #[test]
     fn match_ask_keeping_highest_bid() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 50,
             highest_bid: 40,
             bid: LinkedList::from([PriceLevel::new(Order {
@@ -689,6 +699,7 @@ mod tests {
     #[test]
     fn match_ask_insufficient_volume() {
         let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 50,
             highest_bid: 40,
             bid: LinkedList::from([PriceLevel::new(Order {
@@ -718,6 +729,46 @@ mod tests {
     #[test]
     fn match_ask_consume_two_levels() {
         let mut book = Book {
+            last_consumed_orders: vec![],
+            lowest_ask: 50,
+            ask: LinkedList::from([PriceLevel::new(Order {
+                price: 50,
+                size: 100,
+                id: 3,
+            })]),
+            highest_bid: 40,
+            bid: LinkedList::from([
+                PriceLevel::new(Order {
+                    price: 40,
+                    size: 100,
+                    id: 1,
+                }),
+                PriceLevel::new(Order {
+                    price: 39,
+                    size: 100,
+                    id: 2,
+                }),
+            ]),
+        };
+
+        let a = Order {
+            id: 4,
+            size: 110,
+            price: 38,
+        };
+
+        book.add_ask(a);
+
+        assert_eq!(book.highest_bid, 39);
+        assert_eq!(book.bid_price_levels_count(), 1);
+        assert_eq!(book.last_consumed_orders.len(), 2);
+        assert_eq!(book.last_consumed_orders.iter().map(|x| x.size).sum::<u16>(), 110);
+    }
+
+    #[test]
+    fn match_ask_consume_all_levels() {
+        let mut book = Book {
+            last_consumed_orders: vec![],
             lowest_ask: 50,
             highest_bid: 40,
             bid: LinkedList::from([
@@ -741,13 +792,14 @@ mod tests {
 
         let a = Order {
             id: 4,
-            size: 110,
+            size: 200,
             price: 38,
         };
 
         book.add_ask(a);
 
-        assert_eq!(book.highest_bid, 39);
-        assert_eq!(book.bid_price_levels_count(), 1);
+        assert_eq!(book.highest_bid, 0);
+        assert_eq!(book.bid_price_levels_count(), 0);
+        assert_eq!(book.last_consumed_orders.len(), 2);
     }
 }
